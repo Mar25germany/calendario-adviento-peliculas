@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎄 Calendario de Adviento</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@400;700&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-gradient-start: #d31027; 
+            --bg-gradient-end: #8b0000;   
+            --card-bg: #ffffff;           
+            --text-main: #1f2937;         
+            --accent-gold: #fbbf24;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: radial-gradient(circle at top, var(--bg-gradient-start), var(--bg-gradient-end));
+            color: white; 
+            min-height: 100vh;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1.main-title { font-family: 'Lobster', cursive; letter-spacing: 1px; }
+        .christmas-font { font-family: 'Mountains of Christmas', cursive; }
+
+        /* --- EFECTO FLIP CARD (TARJETA GIRATORIA) --- */
+        .flip-container {
+            background-color: transparent;
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        
+        .flip-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+            border-radius: 1rem;
+        }
+        
+        .flip-container.flipped .flip-inner {
+            transform: rotateY(180deg);
+        }
+        
+        .flip-front, .flip-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 4px solid white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .flip-front {
+            background-color: #fff;
+            color: #1f2937;
+        }
+        
+        .flip-back {
+            background-color: #fbbf24;
+            color: white;
+            transform: rotateY(180deg);
+            background-size: cover;
+            background-position: center;
+        }
+        
+        .flip-overlay {
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+            position: absolute;
+            bottom: 0; left: 0; width: 100%;
+            padding: 8px;
+            text-align: center;
+        }
+
+        /* --- LUCES NAVIDEÑAS --- */
+        .lightrope {
+            text-align: center;
+            white-space: nowrap;
+            overflow: visible;
+            position: fixed;
+            z-index: 100;
+            top: -10px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .lightrope li {
+            position: relative;
+            animation-fill-mode: both;
+            animation-iteration-count: infinite;
+            list-style: none;
+            margin: 0 15px;
+            padding: 0;
+            display: block;
+            width: 14px;
+            height: 30px;
+            border-radius: 50%;
+            background: #fff;
+            z-index: 2;
+        }
+
+        .lightrope li:before { 
+            content: ""; position: absolute; background: #222; width: 12px; height: 10px; border-radius: 3px; top: -5px; left: 1px; z-index: 3;
+        }
+        .lightrope li:after { 
+            content: ""; top: -15px; left: 14px; position: absolute; width: 32px; height: 18px; border-bottom: solid #222 2px; border-radius: 50%; z-index: -1;
+        }
+        .lightrope li:last-child:after { content: none; }
+
+        .lightrope li:nth-child(3n+1) { background: #ffdb00; box-shadow: 0px 5px 20px 2px rgba(255, 219, 0, 0.8); animation: flash-1 1.5s infinite; }
+        .lightrope li:nth-child(3n+2) { background: #00ff22; box-shadow: 0px 5px 20px 2px rgba(0, 255, 34, 0.8); animation: flash-2 2s infinite; }
+        .lightrope li:nth-child(3n+3) { background: #ff0033; box-shadow: 0px 5px 20px 2px rgba(255, 0, 51, 0.8); animation: flash-3 1.8s infinite; }
+
+        @keyframes flash-1 { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        @keyframes flash-2 { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        @keyframes flash-3 { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        /* --- ESTILOS GENERALES --- */
+        .white-card {
+            background: var(--card-bg);
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            color: var(--text-main);
+            border: 4px solid rgba(255,255,255,0.3);
+        }
+
+        .gold-card {
+            background: linear-gradient(135deg, #fceabb 0%, #f8b500 100%);
+            border-radius: 16px;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
+            color: #78350f;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+        .gold-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: shine 3s infinite;
+        }
+        @keyframes shine { 100% { left: 100%; } }
+
+        .input-clean {
+            width: 100%; padding: 16px; color: #000000; background: #f3f4f6; border-radius: 12px; border: 2px solid #e5e7eb; outline: none; font-weight: 700; transition: all 0.3s ease;
+        }
+        .input-clean:focus { background: #fff; border-color: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1); }
+        .input-clean::placeholder { color: #4b5563; font-weight: 600; }
+
+        .btn-action {
+            background: linear-gradient(135deg, #10b981, #059669); color: white; border-radius: 12px; font-weight: bold; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+        }
+        .btn-action:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(16, 185, 129, 0.4); }
+        .btn-action:active { transform: translateY(0); }
+
+        .tab-btn { width: 50%; padding: 12px; font-weight: bold; text-transform: uppercase; font-size: 0.9rem; border-radius: 12px; transition: all 0.3s; }
+        .tab-active { background: #d31027; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .tab-inactive { background: transparent; color: #6b7280; }
+        .tab-inactive:hover { background: #f3f4f6; }
+
+        .snowflake {
+            position: fixed; top: -10px; z-index: 10; color: rgba(255,255,255,0.7); pointer-events: none; animation: snowfall linear infinite;
+        }
+        @keyframes snowfall { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(100vh); opacity: 0; } }
+
+        .hidden { display: none !important; }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(5px);
+        }
+        
+        .avatar-option {
+            font-size: 2.5rem; cursor: pointer; transition: transform 0.2s; padding: 10px; border-radius: 50%; background: #f3f4f6; border: 2px solid transparent; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .avatar-option:hover { transform: scale(1.1); background: #fff; border-color: #fbbf24; }
+        .avatar-option img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* Estilos del Header Flotante */
+        .user-header {
+            position: fixed; top: 20px; right: 20px; display: flex; align-items: center; gap: 12px; background: rgba(255, 255, 255, 0.95); padding: 8px 16px; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 150; backdrop-filter: blur(5px); border: 2px solid rgba(255,255,255,0.5);
+        }
+        @media (max-width: 640px) {
+            .user-header { position: relative; top: 0; right: 0; margin-bottom: 20px; justify-content: center; width: fit-content; margin-left: auto; margin-right: auto; }
+        }
+
+        .calendar-cell {
+            aspect-ratio: 1/1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; transition: all 0.3s ease; border-radius: 1rem;
+        }
+        .calendar-cell:hover { transform: scale(1.05); z-index: 10; }
+    </style>
+</head>
+<body class="relative">
+
+    <!-- LUCES NAVIDEÑAS -->
+    <ul class="lightrope"><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li></ul>
+
+    <div id="snow-container"></div>
+
+    <div id="config-error-overlay" class="hidden modal-overlay">
+        <div class="white-card p-8 max-w-md text-center">
+            <h2 class="text-2xl font-bold mb-2 text-red-600">Falta Configuración</h2>
+            <p class="text-gray-600">Edita el archivo y pega tu <b>API KEY</b>.</p>
+        </div>
+    </div>
+
+    <!-- UI PRINCIPAL -->
+    <div class="container mx-auto px-4 py-8 relative z-20 flex flex-col items-center min-h-screen">
+        
+        <!-- HEADER APP -->
+        <header class="text-center mb-8 mt-12 relative z-30 w-full">
+            <div class="flex items-center justify-center gap-3 mb-2 flex-wrap">
+                <span class="text-3xl md:text-5xl drop-shadow-md filter brightness-110">🎄</span>
+                <h1 class="main-title text-4xl md:text-6xl text-yellow-300 drop-shadow-md text-center leading-tight" style="text-shadow: 2px 2px 0px #b91c1c;">Calendario de Adviento</h1>
+                <span class="text-3xl md:text-5xl drop-shadow-md filter brightness-110">🎬</span>
+            </div>
+        </header>
+
+        <!-- VISTA: AUTH -->
+        <div id="auth-view" class="w-full max-w-md white-card p-6 md:p-8 relative z-30">
+            <div class="bg-gray-100 p-1 rounded-xl mb-8 flex">
+                <button onclick="toggleAuth('login')" id="tab-login" class="tab-btn tab-active">Ingresar</button>
+                <button onclick="toggleAuth('register')" id="tab-register" class="tab-btn tab-inactive">Registro</button>
+            </div>
+            <div class="text-center mb-8">
+                <p class="text-2xl font-bold text-gray-800 christmas-font flex justify-center items-center gap-2">
+                    <span id="auth-greeting-icon">🎅</span> <span id="auth-greeting-text">¡Hola de nuevo!</span>
+                </p>
+            </div>
+            <form id="auth-form" class="space-y-6">
+                <div id="name-field" class="hidden"><input type="text" id="full-name" placeholder="Tu Nombre (Ej: Mar)" class="input-clean"></div>
+                <input type="email" id="email" placeholder="Correo electrónico" class="input-clean" required>
+                <div class="relative">
+                    <input type="password" id="password" placeholder="Contraseña" class="input-clean" required>
+                    <button type="button" onclick="togglePassword()" class="absolute right-4 top-4 text-gray-500 hover:text-green-600 transition"><i class="fas fa-eye" id="eye-icon"></i></button>
+                </div>
+                <div id="auth-msg" class="text-center text-sm text-red-500 font-bold hidden bg-red-50 p-2 rounded-lg"></div>
+                <button type="submit" id="submit-btn" class="w-full btn-action p-4 mt-6 text-lg tracking-widest flex items-center justify-center gap-2"><span>ENTRAR</span> <i class="fas fa-door-open"></i></button>
+            </form>
+        </div>
+
+        <!-- APP (CALENDARIO) -->
+        <div id="app-view" class="hidden w-full max-w-5xl relative z-30">
+            <!-- HEADER FLOTANTE -->
+            <div class="user-header">
+                <div class="flex items-center gap-3">
+                    <!-- AVATAR MÁS GRANDE (w-16 h-16) -->
+                    <div id="avatar-display" class="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border border-gray-300 shadow-sm"><span class="text-3xl">👤</span></div>
+                    <h2 id="welcome-msg" class="text-sm md:text-base text-gray-800 font-bold christmas-font truncate max-w-[120px]">Hola!</h2>
+                </div>
+                <div class="h-4 w-[1px] bg-gray-300 mx-1"></div>
+                <div class="flex gap-1">
+                    <button onclick="document.getElementById('avatar-modal').classList.remove('hidden')" class="w-7 h-7 rounded-full bg-yellow-50 text-yellow-600 hover:bg-yellow-200 flex items-center justify-center transition" title="Cambiar Avatar"><i class="fas fa-pencil-alt text-xs"></i></button>
+                    <button onclick="logout()" class="w-7 h-7 rounded-full bg-red-50 text-red-600 hover:bg-red-200 flex items-center justify-center transition" title="Salir"><i class="fas fa-power-off text-xs"></i></button>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-center gap-6 mb-8 mt-4 md:mt-0">
+                <button onclick="showSection('calendar')" class="btn-action px-8 py-3 w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-500 shadow-yellow-500/50"><i class="fas fa-calendar-alt mr-2"></i> Calendario</button>
+                <button onclick="showSection('upload')" class="px-8 py-3 rounded-xl bg-white text-blue-600 font-bold shadow-lg hover:shadow-xl transition w-full sm:w-auto"><i class="fas fa-film mr-2"></i> Subir Peli</button>
+            </div>
+
+            <!-- SECCIÓN CALENDARIO REAL -->
+            <div id="section-calendar" class="w-full max-w-4xl mx-auto">
+                <h2 class="text-4xl md:text-5xl christmas-font text-white text-center mb-6 drop-shadow-md">Diciembre</h2>
+                <div class="grid grid-cols-7 gap-1 md:gap-4 mb-2 text-center">
+                    <div class="font-bold text-yellow-300 christmas-font text-xs md:text-xl">LUN</div>
+                    <div class="font-bold text-yellow-300 christmas-font text-xs md:text-xl">MAR</div>
+                    <div class="font-bold text-yellow-300 christmas-font text-xs md:text-xl">MIÉ</div>
+                    <div class="font-bold text-yellow-300 christmas-font text-xs md:text-xl">JUE</div>
+                    <div class="font-bold text-yellow-300 christmas-font text-xs md:text-xl">VIE</div>
+                    <div class="font-bold text-yellow-300 christmas-font text-xs md:text-xl">SÁB</div>
+                    <div class="font-bold text-red-200 christmas-font text-xs md:text-xl">DOM</div>
+                </div>
+                <div id="calendar-grid" class="grid grid-cols-7 gap-1 md:gap-4 lg:gap-6"></div>
+            </div>
+
+            <!-- Subir Peli -->
+            <div id="section-upload" class="hidden max-w-lg mx-auto white-card p-8">
+                <h3 class="text-3xl christmas-font text-center mb-8 text-red-600">Agregar Película</h3>
+                <form id="upload-form" class="space-y-6">
+                    <input type="text" id="movie-title" placeholder="Título de la película" class="input-clean" required>
+                    <div class="border-2 border-dashed border-gray-300 bg-gray-50 rounded-xl p-8 text-center cursor-pointer hover:bg-white hover:border-red-400 transition relative group">
+                        <i class="fas fa-cloud-upload-alt text-4xl mb-3 text-gray-400 group-hover:text-red-500 transition"></i>
+                        <p class="text-sm text-gray-500">Toca para seleccionar portada</p>
+                        <input type="file" id="movie-file" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required>
+                    </div>
+                    <div id="upload-msg" class="text-center text-sm font-bold min-h-[20px]"></div>
+                    <button type="submit" class="w-full btn-action p-4 text-white">GUARDAR EN LA BOLSA 🎁</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL AVATAR -->
+    <div id="avatar-modal" class="hidden modal-overlay">
+        <div class="white-card p-8 max-w-sm w-full text-center relative">
+            <button onclick="document.getElementById('avatar-modal').classList.add('hidden')" class="absolute top-4 right-4 text-2xl text-gray-400 hover:text-red-500">&times;</button>
+            <h3 class="text-3xl christmas-font mb-4 text-gray-800">Elige tu Avatar</h3>
+            
+            <!-- GRID DE AVATARES PREDEFINIDOS (SE LLENA CON JS) -->
+            <div id="avatar-grid" class="grid grid-cols-3 gap-6 justify-items-center mb-6"></div>
+
+            <div class="border-t pt-4">
+                <p class="text-sm text-gray-500 mb-2">O sube tu propia foto:</p>
+                <div class="flex gap-2">
+                    <input type="file" id="custom-avatar-input" accept="image/*" class="hidden" onchange="uploadCustomAvatar()">
+                    <button onclick="document.getElementById('custom-avatar-input').click()" class="w-full py-2 bg-gray-200 rounded-lg font-bold text-gray-600 hover:bg-gray-300 transition"><i class="fas fa-upload mr-2"></i> Buscar en mi PC</button>
+                </div>
+                <div id="avatar-upload-msg" class="text-xs text-center mt-2 h-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DUELO -->
+    <div id="duel-modal" class="hidden modal-overlay">
+        <div class="white-card p-6 md:p-8 max-w-4xl w-full mx-4 relative flex flex-col items-center max-h-[90vh] overflow-y-auto">
+            <button onclick="closeDuel()" class="absolute top-4 right-4 text-3xl text-gray-400 hover:text-red-500 z-50">&times;</button>
+            <h2 class="text-3xl md:text-4xl christmas-font text-red-600 mb-2 text-center">Día <span id="duel-day-number"></span></h2>
+            <p class="text-gray-500 mb-6 text-lg text-center">¿Qué película veremos hoy?</p>
+            <div class="w-full grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10 relative">
+                <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 md:flex hidden">
+                    <div class="w-16 h-16 rounded-full text-xl font-bold bg-white text-red-600 border-4 border-red-100 shadow-xl flex items-center justify-center">VS</div>
+                </div>
+                <div id="movie-a-container" class="cursor-pointer group relative p-3 rounded-xl bg-gray-50 hover:bg-yellow-50 transition border-2 border-transparent hover:border-yellow-300" onclick="voteFor('A')">
+                    <img id="img-a" src="" class="w-full h-48 md:h-80 object-cover rounded-lg shadow-md">
+                    <div class="mt-4 text-center"><h3 id="title-a" class="text-xl md:text-2xl font-bold text-gray-700 truncate group-hover:text-yellow-600 transition">A</h3></div>
+                </div>
+                <div class="flex md:hidden justify-center items-center py-2">
+                     <div class="w-12 h-12 rounded-full text-lg font-bold bg-white text-red-600 border shadow flex items-center justify-center">VS</div>
+                </div>
+                <div id="movie-b-container" class="cursor-pointer group relative p-3 rounded-xl bg-gray-50 hover:bg-yellow-50 transition border-2 border-transparent hover:border-yellow-300" onclick="voteFor('B')">
+                    <img id="img-b" src="" class="w-full h-48 md:h-80 object-cover rounded-lg shadow-md">
+                    <div class="mt-4 text-center"><h3 id="title-b" class="text-xl md:text-2xl font-bold text-gray-700 truncate group-hover:text-yellow-600 transition">B</h3></div>
+                </div>
+            </div>
+            <div id="vote-message" class="mt-6 font-bold text-xl h-8 text-center text-green-600"></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://gxmffvomofibtayteooa.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4bWZmdm9tb2ZpYnRheXRlb29hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3ODEzMzgsImV4cCI6MjA4MDM1NzMzOH0.fV7q5itF79PUbH6CRW0fALE43cFS23-_klNlTdnIfNM';
+
+        // -----------------------------------------------------------
+        // 📸 LISTA DE AVATARES PREDEFINIDOS (¡PEGA AQUÍ TUS LINKS!)
+        // -----------------------------------------------------------
+        const PREDEFINED_AVATARS = [
+            'https://gxmffvomofibtayteooa.supabase.co/storage/v1/object/public/posters/presets/1.png', // Ejemplo: Santa
+            'https://gxmffvomofibtayteooa.supabase.co/storage/v1/object/public/posters/presets/2.png', // Ejemplo: Grinch
+            'https://gxmffvomofibtayteooa.supabase.co/storage/v1/object/public/posters/presets/3.png', // Ejemplo: Grinch
+            'https://gxmffvomofibtayteooa.supabase.co/storage/v1/object/public/posters/presets/4.png', // Ejemplo: Grinch
+            'https://gxmffvomofibtayteooa.supabase.co/storage/v1/object/public/posters/presets/5.png', // Ejemplo: Grinch
+            // Si no tienes links aun, puedes dejar emojis:
+            '🎅', '🤶', '🦌', '☃️', '🍪', '👑' 
+        ];
+
+        let supabase, currentUser, isLogin = true;
+
+        try {
+            if (SUPABASE_KEY.length < 10 || SUPABASE_KEY.includes('TU_KEY')) throw "No Key";
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            initApp();
+        } catch { document.getElementById('config-error-overlay').classList.remove('hidden'); }
+
+        function initApp() {
+            createSnow();
+            supabase.auth.getSession().then(({ data: { session } }) => {
+                if (session) handleLogin(session.user);
+            });
+            setupRealtime();
+        }
+
+        function setupRealtime() {
+            supabase.channel('custom-all-channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_days' }, () => loadCalendar())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'votes' }, () => loadCalendar())
+            .subscribe();
+        }
+
+        // --- AUTH ---
+        window.toggleAuth = (mode) => {
+            isLogin = mode === 'login';
+            document.getElementById('name-field').classList.toggle('hidden', isLogin);
+            document.getElementById('auth-greeting-text').textContent = isLogin ? "¡Hola de nuevo!" : "¡Únete a la tradición!";
+            document.getElementById('submit-btn').innerHTML = isLogin ? "<span>ENTRAR</span> <i class='fas fa-door-open'></i>" : "<span>REGISTRARSE</span> <i class='fas fa-star'></i>";
+            
+            const loginTab = document.getElementById('tab-login');
+            const regTab = document.getElementById('tab-register');
+            loginTab.className = isLogin ? "tab-btn tab-active" : "tab-btn tab-inactive";
+            regTab.className = !isLogin ? "tab-btn tab-active" : "tab-btn tab-inactive";
+            document.getElementById('auth-msg').classList.add('hidden');
+        }
+
+        window.togglePassword = function() {
+            const input = document.getElementById('password');
+            input.type = input.type === "password" ? "text" : "password";
+        }
+
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const pass = document.getElementById('password').value.trim();
+            const name = document.getElementById('full-name').value.trim();
+            const msg = document.getElementById('auth-msg');
+            const btn = document.getElementById('submit-btn');
+
+            msg.classList.add('hidden'); btn.classList.add('opacity-50');
+            
+            try {
+                if (isLogin) {
+                    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+                    if (error) throw error;
+                    handleLogin(data.user);
+                } else {
+                    if(!name) throw new Error("¡Por favor dinos tu nombre!");
+                    const { error } = await supabase.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
+                    if (error) throw error;
+                    alert("¡Registro exitoso! Revisa tu correo.");
+                    toggleAuth('login');
+                }
+            } catch (err) { 
+                console.error(err); msg.textContent = err.message.includes("Invalid login") ? "Credenciales incorrectas" : err.message; msg.classList.remove('hidden'); 
+            } finally { btn.classList.remove('opacity-50'); }
+        });
+
+        async function handleLogin(user) {
+            currentUser = user;
+            document.getElementById('auth-view').classList.add('hidden');
+            document.getElementById('app-view').classList.remove('hidden');
+            refreshProfile();
+            loadCalendar();
+        }
+
+        // --- PERFIL & AVATARES ---
+        async function refreshProfile() {
+            const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+            if (data) {
+                const avatarDiv = document.getElementById('avatar-display');
+                const nameLabel = document.getElementById('welcome-msg');
+                nameLabel.textContent = `Hola, ${data.full_name}`;
+                renderAvatar(avatarDiv, data.avatar_url);
+            }
+        }
+
+        function renderAvatar(container, url) {
+            if (url && (url.startsWith('http') || url.startsWith('data:image'))) {
+                container.innerHTML = `<img src="${url}" alt="Avatar" class="w-full h-full object-cover">`;
+            } else {
+                container.innerHTML = `<span class="text-3xl">${url || '👤'}</span>`;
+            }
+        }
+
+        // Cargar Modal de Avatares (Mezcla imágenes y emojis)
+        window.openAvatarModal = () => {
+            const grid = document.getElementById('avatar-grid');
+            grid.innerHTML = '';
+            PREDEFINED_AVATARS.forEach(opt => {
+                const div = document.createElement('div');
+                div.className = "avatar-option cursor-pointer";
+                div.onclick = () => saveAvatar(opt);
+                renderAvatar(div, opt);
+                grid.appendChild(div);
+            });
+            document.getElementById('avatar-modal').classList.remove('hidden');
+        }
+
+        window.saveAvatar = async (value) => {
+            await supabase.from('profiles').update({ avatar_url: value }).eq('id', currentUser.id);
+            document.getElementById('avatar-modal').classList.add('hidden');
+            refreshProfile();
+        }
+
+        window.uploadCustomAvatar = async () => {
+            const fileInput = document.getElementById('custom-avatar-input');
+            const file = fileInput.files[0];
+            const msg = document.getElementById('avatar-upload-msg');
+            if(!file) return;
+            msg.textContent = "Subiendo...";
+            try {
+                const path = `avatars/${currentUser.id}-${Date.now()}.${file.name.split('.').pop()}`;
+                const { error: upErr } = await supabase.storage.from('posters').upload(path, file);
+                if (upErr) throw upErr;
+                const { data: { publicUrl } } = supabase.storage.from('posters').getPublicUrl(path);
+                await saveAvatar(publicUrl);
+                msg.textContent = "";
+            } catch (err) { console.error(err); msg.textContent = "Error al subir"; }
+        }
+
+        window.logout = async () => { await supabase.auth.signOut(); window.location.reload(); }
+
+        // --- CALENDARIO & LOGICA ---
+        async function loadCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const { data: days } = await supabase.from('calendar_days').select('*, m1:movies!movie_a_id(*), m2:movies!movie_b_id(*), vote:votes(movie_id)').order('day_number');
+            grid.innerHTML = '';
+            
+            const daysMap = {}; days.forEach(d => daysMap[d.day_number] = d);
+
+            for (let i = 1; i <= 31; i++) {
+                const dayData = daysMap[i];
+                const cell = document.createElement('div');
+                let contentHTML = "", clickHandler = null, className = "calendar-cell border-4 ";
+
+                if (dayData) {
+                    const isOpen = dayData.is_active;
+                    const hasDuel = dayData.m1 && dayData.m2;
+                    const votes = dayData.vote || [];
+                    const myVote = votes.find(v => v.user_id === currentUser.id);
+                    
+                    let winnerImg = null;
+                    if(votes.length > 0 && hasDuel) {
+                        const counts = {}; votes.forEach(v => counts[v.movie_id] = (counts[v.movie_id] || 0) + 1);
+                        if((counts[dayData.m1.id]||0) >= (counts[dayData.m2.id]||0)) winnerImg = dayData.m1.image_url;
+                        else winnerImg = dayData.m2.image_url;
+                    }
+
+                    if (i === 25) {
+                        className += "border-yellow-200 gold-card hover:scale-105";
+                        contentHTML = `<div class="text-center"><span class="text-3xl md:text-5xl drop-shadow-md">🎄</span><h3 class="text-xs md:text-lg font-bold mt-1 christmas-font text-red-800 leading-none">¡FELIZ<br>NAVIDAD!</h3></div>`;
+                    } else if (myVote && winnerImg) {
+                        // FLIP CARD (Ya votó)
+                        className = `aspect-square flip-container`;
+                        contentHTML = `
+                            <div class="flip-inner">
+                                <div class="flip-front">
+                                    <span class="text-4xl font-bold text-gray-800 font-mono">${i}</span>
+                                    <div class="mt-1 text-green-500 text-2xl"><i class="fas fa-check-circle"></i></div>
+                                </div>
+                                <div class="flip-back" style="background-image: url('${winnerImg}')">
+                                    <div class="flip-overlay"><span class="text-white font-bold drop-shadow-md text-xs uppercase tracking-wider">Ganadora</span></div>
+                                </div>
+                            </div>`;
+                        cell.onclick = function() { this.classList.toggle('flipped'); };
+                    } else if (isOpen) {
+                        className += "white-card cursor-pointer hover:scale-105 border-white";
+                        contentHTML = `<span class="text-4xl font-bold text-gray-800 font-mono">${i}</span><div class="mt-1 text-base md:text-lg animate-pulse text-yellow-500">⚡</div>`;
+                        if (hasDuel) clickHandler = () => openDuel(dayData, myVote);
+                    } else {
+                        className += "bg-red-900/50 opacity-60 border-red-800";
+                        contentHTML = `<span class="text-3xl font-bold text-red-200 font-mono">${i}</span><i class="fas fa-lock mt-1 text-red-300 text-xs md:text-base"></i>`;
+                    }
+                } else {
+                    className += "bg-white/10 border-transparent opacity-30";
+                    contentHTML = `<span class="text-3xl font-bold text-white font-mono">${i}</span>`;
+                }
+                cell.className = className; cell.innerHTML = contentHTML;
+                if (clickHandler) cell.onclick = clickHandler;
+                grid.appendChild(cell);
+            }
+        }
+
+        // --- DUELOS ---
+        let currentDayData = null;
+        function openDuel(day, myVote) {
+            currentDayData = day;
+            document.getElementById('duel-day-number').textContent = day.day_number;
+            document.getElementById('img-a').src = day.m1.image_url;
+            document.getElementById('title-a').textContent = day.m1.title;
+            document.getElementById('img-b').src = day.m2.image_url;
+            document.getElementById('title-b').textContent = day.m2.title;
+            
+            const msg = document.getElementById('vote-message');
+            const contA = document.getElementById('movie-a-container');
+            const contB = document.getElementById('movie-b-container');
+            contA.className = "cursor-pointer group relative p-3 rounded-xl bg-gray-50 hover:bg-yellow-50 transition border-2 border-transparent hover:border-yellow-300";
+            contB.className = "cursor-pointer group relative p-3 rounded-xl bg-gray-50 hover:bg-yellow-50 transition border-2 border-transparent hover:border-yellow-300";
+
+            if (myVote) {
+                msg.textContent = "Ya votaste hoy ✅";
+                if(myVote.movie_id === day.m1.id) contA.classList.add('selected-movie');
+                else contB.classList.add('selected-movie');
+            } else {
+                msg.textContent = "¡Toca tu favorita!";
+            }
+            document.getElementById('duel-modal').classList.remove('hidden');
+        }
+
+        window.closeDuel = () => document.getElementById('duel-modal').classList.add('hidden');
+
+        window.voteFor = async (option) => {
+            const existing = currentDayData.vote.find(v => v.user_id === currentUser.id);
+            if(existing) return;
+            
+            const movId = option === 'A' ? currentDayData.m1.id : currentDayData.m2.id;
+            document.getElementById('vote-message').textContent = "Votando...";
+            const { error } = await supabase.from('votes').insert([{ day_number: currentDayData.day_number, user_id: currentUser.id, movie_id: movId }]);
+            if(!error) {
+                document.getElementById('vote-message').textContent = "¡Voto Guardado! 🎉";
+                setTimeout(() => { closeDuel(); loadCalendar(); }, 1000);
+            }
+        }
+
+        // --- SUBIDA ---
+        window.showSection = (id) => {
+            document.getElementById('section-calendar').classList.toggle('hidden', id !== 'calendar');
+            document.getElementById('section-upload').classList.toggle('hidden', id !== 'upload');
+        }
+
+        document.getElementById('upload-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = document.getElementById('movie-file').files[0];
+            const title = document.getElementById('movie-title').value;
+            const msg = document.getElementById('upload-msg');
+            if(!file) { alert("Falta foto"); return; }
+            msg.textContent = "Subiendo...";
+            try {
+                const path = `${currentUser.id}-${Date.now()}.${file.name.split('.').pop()}`;
+                const { error: upErr } = await supabase.storage.from('posters').upload(path, file);
+                if (upErr) throw upErr;
+                const { data: { publicUrl } } = supabase.storage.from('posters').getPublicUrl(path);
+                const { error: dbErr } = await supabase.from('movies').insert([{ title, image_url: publicUrl, user_id: currentUser.id }]);
+                if (dbErr) throw dbErr;
+                msg.textContent = "¡Listo! 🎬";
+                document.getElementById('upload-form').reset();
+            } catch (err) { console.error(err); msg.textContent = "Error al subir"; }
+        });
+
+        function createSnow() {
+            const c = document.getElementById('snow-container');
+            for(let i=0; i<50; i++) {
+                const d = document.createElement('div'); d.className='snowflake'; d.innerHTML='❄';
+                d.style.left = Math.random()*100+'vw'; d.style.animationDuration = (Math.random()*3+2)+'s'; d.style.animationDelay = Math.random()*5+'s';
+                c.appendChild(d);
+            }
+        }
+    </script>
+</body>
+</html>
