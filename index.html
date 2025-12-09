@@ -104,12 +104,13 @@
         .calendar-cell.locked-day { opacity: 0.5; background: rgba(0,0,0,0.2); border-color: transparent; }
 
         /* Efecto Flip para ganadoras */
-        .flip-container { perspective: 1000px; cursor: pointer; border: none; background: transparent; aspect-ratio: 2/3 !important; }
+        .flip-container { perspective: 1000px; cursor: pointer; border: none; background: transparent; aspect-ratio: 2/3 !important; position: relative; z-index: 1; }
+        .flip-container:hover { z-index: 20; } /* Para que al girar no se tape con nada */
         .flip-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.8s; transform-style: preserve-3d; border-radius: 0.75rem; }
         .flip-container:hover .flip-inner { transform: rotateY(180deg); } 
-        .flip-front, .flip-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--accent-gold); }
-        .flip-front { background-size: cover; background-position: center; }
-        .flip-back { background: var(--accent-gold); color: #312e81; transform: rotateY(180deg); flex-direction: column; font-weight: bold; }
+        /* MODIFICADO: overflow: visible para permitir badges flotantes fuera */
+        .flip-front { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; border: 1px solid var(--accent-gold); background-size: cover; background-position: center; overflow: visible; }
+        .flip-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--accent-gold); background: var(--accent-gold); color: #312e81; transform: rotateY(180deg); flex-direction: column; font-weight: bold; }
 
         /* --- MODAL Y RESPONSIVIDAD --- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(8px); }
@@ -423,7 +424,18 @@
 
         function renderAvatar(container, url) {
             if (url && (url.startsWith('http') || url.startsWith('data:image'))) {
-                container.innerHTML = `<img src="${url}" alt="Avatar" class="w-full h-full object-cover rounded-full">`;
+                // MODIFICADO: Sistema de "Lazy Loading" con feedback visual (spinner)
+                // 1. Ponemos un spinner temporal
+                container.innerHTML = `<div class="w-full h-full flex items-center justify-center bg-gray-800"><i class="fas fa-spinner fa-spin text-yellow-400 text-xs"></i></div>`;
+                
+                // 2. Cargamos la imagen en memoria
+                const img = new Image();
+                img.src = url;
+                
+                // 3. Cuando esté lista, la mostramos
+                img.onload = () => {
+                     container.innerHTML = `<img src="${url}" alt="Avatar" class="w-full h-full object-cover rounded-full animate-fade-in">`;
+                };
             } else {
                 container.innerHTML = `<span class="text-2xl">${url || '👤'}</span>`;
             }
@@ -452,7 +464,15 @@
                     
                     if(validFiles.length > 0) {
                         avatarsToShow = validFiles.map(file => {
-                            const { data } = supabase.storage.from('posters').getPublicUrl(`presets/${file.name}`);
+                            // OPTIMIZACIÓN: Solicitamos una versión transformada (miniatura)
+                            // Esto reduce drásticamente el peso de la imagen
+                            const { data } = supabase.storage.from('posters').getPublicUrl(`presets/${file.name}`, {
+                                transform: {
+                                    width: 100,
+                                    height: 100,
+                                    resize: 'cover' // Recorta para llenar el cuadrado sin deformar
+                                }
+                            });
                             return data.publicUrl;
                         });
                         loadedFromList = true;
@@ -467,7 +487,10 @@
                 const manualList = ['1.png', '2.0.png', '3.png', '4.png', '5.png', '6.png', '7.png', '8.png'];
                 
                 avatarsToShow = manualList.map(name => {
-                    const { data } = supabase.storage.from('posters').getPublicUrl(`presets/${name}`);
+                    // Aplicamos la misma optimización al plan B
+                    const { data } = supabase.storage.from('posters').getPublicUrl(`presets/${name}`, {
+                        transform: { width: 100, height: 100, resize: 'cover' }
+                    });
                     return data.publicUrl;
                 });
             }
@@ -533,8 +556,8 @@
                     const myVote = votes.find(v => v.user_id === currentUser.id);
                     
                     let winnerImg = null;
-                    let labelText = "GANADORA";
-                    let labelClass = "text-white";
+                    let labelText = "GANADORA 👑";
+                    let labelClass = "text-white font-bold tracking-wider";
 
                     // LOGICA DE GANADOR, EMPATE Y MATCH
                     if(votes.length > 0 && hasDuel) {
@@ -575,7 +598,9 @@
                         contentHTML = `
                             <div class="flip-inner">
                                 <div class="flip-front" style="background-image: url('${winnerImg}'); border: 2px solid #fbbf24;">
-                                    <div class="absolute bottom-0 w-full bg-black/70 text-xs text-center py-1 ${labelClass}">${labelText}</div>
+                                    <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 px-3 py-1 rounded-full bg-black/80 backdrop-blur-md border border-white/20 shadow-[0_4px_10px_rgba(0,0,0,0.5)] whitespace-nowrap z-50">
+                                        <span class="text-[10px] font-bold tracking-wider ${labelClass}">${labelText}</span>
+                                    </div>
                                 </div>
                                 <div class="flip-back"><span class="text-4xl font-mono">${i}</span><div class="mt-1 text-indigo-900 text-2xl"><i class="fas fa-check-circle"></i></div></div>
                             </div>`;
